@@ -1265,8 +1265,13 @@
             }
         }
         
+        // 检查是否支持 File System Access API（选择文件夹功能）
+        function supportsFileSystemAccess() {
+            return 'showDirectoryPicker' in window;
+        }
+        
         // 导出Excel
-        function exportExcel() {
+        async function exportExcel() {
             const validData = photoData.filter(p => p.status === 'success' || p.status === 'no-location');
             
             if (validData.length === 0) {
@@ -1290,8 +1295,27 @@
             XLSX.utils.book_append_sheet(wb, ws, '照片位置信息');
             
             const fileName = `照片位置信息_${new Date().toISOString().slice(0,10)}.xlsx`;
-            XLSX.writeFile(wb, fileName);
             
+            // 尝试使用文件选择器
+            if (supportsFileSystemAccess()) {
+                try {
+                    const handle = await window.showDirectoryPicker();
+                    const writable = await handle.getFileHandle(fileName, { create: true });
+                    const writableStream = await writable.createWritable();
+                    const buffer = await XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    await writableStream.write(buffer);
+                    await writableStream.close();
+                    showToast(`✅ 已保存到: ${handle.name}`);
+                    return;
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        console.log('使用默认下载方式', e);
+                    }
+                }
+            }
+            
+            // 默认下载方式
+            XLSX.writeFile(wb, fileName);
             showToast(`✅ 导出成功！共 ${data.length} 条记录`);
         }
         
@@ -1453,10 +1477,32 @@
             
             if (!exportCancelled) {
                 const content = await zip.generateAsync({type: "blob"});
+                const zipFileName = `带水印照片_${new Date().toISOString().slice(0,10)}.zip`;
+                
+                // 尝试使用文件夹选择器
+                if (supportsFileSystemAccess()) {
+                    try {
+                        const dirHandle = await window.showDirectoryPicker();
+                        const fileHandle = await dirHandle.getFileHandle(zipFileName, { create: true });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        
+                        document.getElementById('exportModal').classList.remove('show');
+                        showToast(`✅ 已保存到文件夹: ${dirHandle.name}`);
+                        return;
+                    } catch (e) {
+                        if (e.name !== 'AbortError') {
+                            console.log('使用默认下载方式', e);
+                        }
+                    }
+                }
+                
+                // 默认下载方式
                 const url = URL.createObjectURL(content);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `带水印照片_${new Date().toISOString().slice(0,10)}.zip`;
+                a.download = zipFileName;
                 a.click();
                 URL.revokeObjectURL(url);
                 
