@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>照片位置提取器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --transition-fast: 0.2s ease;
+            --transition-normal: 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            padding: 16px;
+            padding-bottom: 100px;
+        }
+        
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 24px;
+            animation: fadeInDown 0.5s ease;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--card-shadow);
+            animation: fadeInUp 0.5s ease;
+        }
+        
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+        
+        /* Input */
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        
+        .input-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #6b7280;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: var(--transition-fast);
+            background: #f9fafb;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+        
+        .input-field::placeholder {
+            color: #9ca3af;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(rgba(255,255,255,0.1), transparent);
+            pointer-events: none;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-primary {
+            background: var(--bg-gradient);
+            color: white;
+        }
+        
+        .btn-primary:active {
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+        
+        .btn-outline {
+            background: white;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .btn-outline:active {
+            background: #f9fafb;
+        }
+        
+        .btn-icon {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: 12px;
+        }
+        
+        /* Tips */
+        .tip-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 12px;
+            font-size: 12px;
+            color: #92400e;
+            line-height: 1.5;
+        }
+        
+        .tip-box a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .stat-box {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            transition: var(--transition-fast);
+        }
+        
+        .stat-box:active {
+            transform: scale(0.95);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--bg-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        /* Photo List */
+        .photo-list {
+            max-height: 350px;
+            overflow-y: auto;
+            margin: 0 -20px;
+            padding: 0 20px;
+        }
+        
+        .photo-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .photo-list::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 2px;
+        }
+        
+        .photo-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+            gap: 12px;
+            transition: var(--transition-fast);
+        }
+        
+        .photo-item:active {
+            background: #f9fafb;
+            margin: 0 -20px;
+            padding: 12px 20px;
+        }
+        
+        .photo-item:last-child {
+            border-bottom: none;
+        }
+        
+        .photo-thumb {
+            width: 52px;
+            height: 52px;
+            object-fit: cover;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        
+        .photo-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .photo-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        
+        .photo-detail {
+            font-size: 11px;
+            color: #9ca3af;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .photo-remark {
+            font-size: 11px;
+            color: var(--warning-color);
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        
+        .status-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-processing {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-no-location {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-text {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+        
+        /* Export Buttons */
+        .export-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .export-section .btn {
+            margin-top: 0;
+        }
+        
+        .export-section .btn-full {
+            grid-column: 1 / -1;
+        }
+        
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .modal-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .modal-actions .btn {
+            margin-top: 0;
+        }
+        
+        /* Progress */
+        .progress-wrapper {
+            margin: 20px 0;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .progress-track {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: var(--bg-gradient);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        /* Form */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .form-row label {
+            min-width: 70px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+        
+        .form-row input,
+        .form-row select {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        
+        .form-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            flex: none;
+        }
+        
+        /* Preview */
+        .preview-box {
+            background: #f9fafb;
+            border-radius: 10px;
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+        
+        .preview-item {
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+        
+        .preview-item:last-child {
+            border-bottom: none;
+        }
+        
+        .preview-old {
+            color: #9ca3af;
+            text-decoration: line-through;
+        }
+        
+        .preview-new {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .toast.show {
+            opacity: 1;
+        }
+        
+        /* Checkbox custom */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-wrapper input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+        }
+        
+        .checkbox-wrapper label {
+            font-size: 13px;
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📍 照片位置提取器</h1>
+            <p>批量提取照片的GPS位置和地址信息</p>
+        </div>
+        
+        <!-- API Key Card -->
+        <div class="card" style="animation-delay: 0.1s;">
+            <div class="card-title">API 配置</div>
+            <div class="input-wrapper">
+                <label class="input-label">高德地图 API Key</label>
+                <input type="text" class="input-field" id="amapKey" placeholder="请输入高德地图API Key">
+            </div>
+            <div class="tip-box">
+                <strong>💡 提示：</strong>需要输入高德地图API Key才能获取地址信息。<br>
+                免费申请：<a href="https://console.amap.com/" target="_blank">高德开放平台</a>
+            </div>
+        </div>
+        
+        <!-- Select Photos Card -->
+        <div class="card" style="animation-delay: 0.2s;">
+            <button class="btn btn-primary" id="selectPhotoBtn">
+                <span>📁</span>
+                <span>选择照片</span>
+            </button>
+            <input type="file" id="fileInput" accept="image/*" multiple onchange="handleFiles(this.files)">
+            <div class="tip-box" style="margin-top: 12px;">
+                支持一次性选择多张照片，可从相册或文件管理中选择
+            </div>
+        </div>
+        
+        <!-- Stats Card -->
+        <div class="card" id="statsCard" style="display: none; animation-delay: 0.3s;">
+            <div class="card-title">处理状态</div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">照片总数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="successCount">0</div>
+                    <div class="stat-label">已提取</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="locationCount">0</div>
+                    <div class="stat-label">有位置</div>
+                </div>
+            </div>
+            <div class="progress-wrapper" id="progressWrapper" style="display: none;">
+                <div class="progress-text">
+                    <span>正在处理...</span>
+                    <span id="progressText">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Photo List Card -->
+        <div class="card" id="photoListCard" style="display: none; animation-delay: 0.4s;">
+            <div class="card-title">照片列表</div>
+            <div class="photo-list" id="photoList">
+                <div class="empty-state">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <path d="M21 15l-5-5L5 21"/>
+                    </svg>
+                    <div class="empty-text">暂无照片，请先选择照片</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Card -->
+        <div class="card" id="exportCard" style="display: none; animation-delay: 0.5s;">
+            <div class="card-title">导出选项</div>
+            <div class="export-section">
+                <button class="btn btn-success" onclick="exportExcel()">
+                    <span>📊</span>
+                    <span>Excel表格</span>
+                </button>
+                <button class="btn btn-warning" onclick="showBatchRenameModal()">
+                    <span>🖼️</span>
+                    <span>水印照片</span>
+                </button>
+                <button class="btn btn-danger btn-full" onclick="clearAll()">
+                    <span>🗑️</span>
+                    <span>清空全部</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <!-- Batch Rename Modal -->
+    <div class="modal-overlay" id="batchRenameModal">
+        <div class="modal-content">
+            <div class="modal-title">🔧 批量重命名</div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="input-label">命名方式</label>
+                    <select class="input-field" id="renameType" onchange="updatePreview()">
+                        <option value="sequential">顺序编号 (001, 002...)</option>
+                        <option value="time">时间戳</option>
+                        <option value="location">地址缩写</option>
+                        <option value="custom">自定义前缀</option>
+                    </select>
+                </div>
+                <div class="form-group" id="prefixGroup" style="display: none;">
+                    <label class="input-label">自定义前缀</label>
+                    <input type="text" class="input-field" id="customPrefix" placeholder="例如: 团结小学" oninput="updatePreview()">
+                </div>
+                <div class="form-row">
+                    <label>起始编号</label>
+                    <input type="number" id="startNumber" value="1" min="0" oninput="updatePreview()">
+                </div>
+                <div class="form-row">
+                    <label>编号位数</label>
+                    <input type="number" id="numberDigits" value="3" min="1" max="6" oninput="updatePreview()">
+                </div>
+                <div class="form-row">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="includeRemark" checked onchange="updatePreview()">
+                        <label>包含备注到文件名</label>
+                    </div>
+                </div>
+                <label class="input-label" style="margin-top: 16px;">预览</label>
+                <div class="preview-box" id="previewList">
+                    <div class="preview-item" style="color: #9ca3af;">暂无预览</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeBatchRenameModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmBatchRename()">确认导出</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Export Progress Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal-content" style="text-align: center;">
+            <div class="modal-title">🔄 正在导出...</div>
+            <div class="progress-wrapper">
+                <div class="progress-text">
+                    <span id="exportStatus">0 / 0</span>
+                    <span id="exportPercent">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar" id="exportProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <button class="btn btn-danger" onclick="cancelExport()">取消导出</button>
+        </div>
+    </div>
+    
+    <script>
+        // 存储照片数据
+        let photoData = [];
+        let exportCancelled = false;
+        
+        // Toast提示
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // 检查API Key
+        function checkApiKey() {
+            const amapKey = document.getElementById('amapKey').value.trim();
+            if (!amapKey) {
+                showToast('⚠️ 请先输入高德地图API Key');
+                document.getElementById('amapKey').focus();
+                return false;
+            }
+            return amapKey;
+        }
+        
+        // 选择照片按钮点击事件
+        document.getElementById('selectPhotoBtn').addEventListener('click', function() {
+            const amapKey = checkApiKey();
+            if (amapKey) {
+                document.getElementById('fileInput').click();
+            }
+        });
+        
+        // 高德地图逆地理编码 - 优化版，参照元道经纬度相机
+        async function getAddress(lat, lng, amapKey) {
+            try {
+                // 使用更高精度的逆地理编码，获取POI信息
+                const url = `https://restapi.amap.com/v3/geocode/regeo?key=${amapKey}&location=${lng},${lat}&radius=2000&extensions=all&output=json`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.status === '1' && data.regeocode) {
+                    const regeocode = data.regeocode;
+                    const addressComponent = regeocode.addressComponent;
+                    const formattedAddress = regeocode.formatted_address || '';
+                    const pois = regeocode.pois || [];
+                    
+                    // 构建详细地址
+                    let address = '';
+                    const province = addressComponent.province || '';
+                    const city = addressComponent.city || addressComponent.province || '';
+                    const district = addressComponent.district || '';
+                    const township = addressComponent.township || '';
+                    
+                    // 优先使用省市区+乡镇
+                    if (province) address += province;
+                    if (city && city !== province) address += city;
+                    if (district) address += district;
+                    if (township) address += township;
+                    
+                    // 如果地址太短，使用formatted_address
+                    if (address.length < 8 && formattedAddress) {
+                        address = formattedAddress;
+                    }
+                    
+                    // 获取最近的POI作为"在XX附近"
+                    // POI类型优先级：小区 > 道路 > 河流 > 公园 > 景区 > 楼宇 > 店铺 > 其他
+                    const poiPriority = ['住宅区', '道路', '河流', '公园', '风景名胜', '商务住宅', '风景名胜', '地名地址', '公共设施'];
+                    let nearBy = '';
+                    
+                    // 找最近的POI
+                    if (pois && pois.length > 0) {
+                        // 按距离排序，取最近的
+                        pois.sort((a, b) => (a.distance || 999999) - (b.distance || 999999));
+                        
+                        // 优先找符合类型的POI
+                        for (const type of poiPriority) {
+                            const poi = pois.find(p => p.type && p.type.includes(type));
+                            if (poi && poi.name) {
+                                nearBy = poi.name;
+                                break;
+                            }
+                        }
+                        
+                        // 如果没找到对应类型，取最近的POI
+                        if (!nearBy && pois[0] && pois[0].name) {
+                            nearBy = pois[0].name;
+                        }
+                    }
+                    
+                    // 如果没有POI，使用街道/乡镇
+                    if (!nearBy) {
+                        if (township) {
+                            nearBy = township;
+                        } else if (district) {
+                            nearBy = district;
+                        }
+                    }
+                    
+                    return {
+                        fullAddress: address || formattedAddress || '未知地址',
+                        nearBy: nearBy,
+                        district: district,
+                        city: city,
+                        province: province
+                    };
+                }
+                return { fullAddress: '地址解析失败', nearBy: '', district: '', city: '', province: '' };
+            } catch (e) {
+                console.error('地址解析错误:', e);
+                return { fullAddress: '地址解析失败', nearBy: '', district: '', city: '', province: '' };
+            }
+        }
+        
+        // 解析GPS坐标 - 增强版，尝试多个GPS字段
+        function parseGPS(gpsData) {
+            if (!gpsData) return null;
+            
+            // 尝试多种GPS数据格式
+            let lat = null, lng = null;
+            
+            // 方式1: 标准GPSLatitude/GPSLongitude
+            if (gpsData.GPSLatitude && gpsData.GPSLongitude) {
+                lat = convertDMSToDD(gpsData.GPSLatitude, gpsData.GPSLatitudeRef);
+                lng = convertDMSToDD(gpsData.GPSLongitude, gpsData.GPSLongitudeRef);
+            }
+            // 方式2: 小写字段
+            else if (gpsData.gpsLatitude && gpsData.gpsLongitude) {
+                lat = convertDMSToDD(gpsData.gpsLatitude, gpsData.gpsLatitudeRef || 'N');
+                lng = convertDMSToDD(gpsData.gpsLongitude, gpsData.gpsLongitudeRef || 'E');
+            }
+            // 方式3: GPSMapDatum和其他字段
+            else if (gpsData.GPSLatitude && gpsData.GPSLongitudeRef) {
+                lat = convertDMSToDD(gpsData.GPSLatitude, gpsData.GPSLatitudeRef || 'N');
+                lng = convertDMSToDD(gpsData.GPSLongitude, gpsData.GPSLongitudeRef || 'E');
+            }
+            
+            // 验证坐标是否有效（中国范围）
+            if (lat !== null && lng !== null) {
+                if (lat >= 3 && lat <= 54 && lng >= 73 && lng <= 135) {
+                    return { lat: parseFloat(lat.toFixed(6)), lng: parseFloat(lng.toFixed(6)) };
+                }
+            }
+            
+            return null;
+        }
+        
+        // 转换DMS(度分秒)到十进制
+        function convertDMSToDD(dms, ref) {
+            if (!dms || !Array.isArray(dms) || dms.length < 3) return null;
+            
+            try {
+                let dd = dms[0] + dms[1] / 60 + dms[2] / 3600;
+                // 处理分数部分
+                if (dms.length > 3 && typeof dms[3] === 'number') {
+                    dd += dms[3] / 3600000;
+                }
+                if (ref === 'S' || ref === 'W' || ref === 's' || ref === 'w') {
+                    dd = -dd;
+                }
+                return dd;
+            } catch (e) {
+                console.error('DMS转换失败:', e);
+                return null;
+            }
+        }
+        
+        // 获取地址缩写
+        function getAddressShort(address) {
+            if (!address) return 'unknown';
+            const match = address.match(/([省市区县])([^\s]+?(?:省市区县))/);
+            if (match) {
+                return match[2].slice(0, 4);
+            }
+            return address.slice(0, 4);
+        }
+        
+        // 处理文件选择
+        async function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            const amapKey = checkApiKey();
+            if (!amapKey) {
+                document.getElementById('fileInput').value = '';
+                return;
+            }
+            
+            // 显示卡片
+            document.getElementById('statsCard').style.display = 'block';
+            document.getElementById('photoListCard').style.display = 'block';
+            document.getElementById('exportCard').style.display = 'block';
+            document.getElementById('progressWrapper').style.display = 'block';
+            
+            const fileArray = Array.from(files);
+            const total = fileArray.length;
+            
+            showToast(`已选择 ${total} 张照片，开始处理...`);
+            
+            for (let i = 0; i < total; i++) {
+                const file = fileArray[i];
+                const id = Date.now() + '_' + i;
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const photoInfo = {
+                        id: id,
+                        file: file,
+                        name: file.name,
+                        newName: '',
+                        thumbnail: e.target.result,
+                        status: 'processing',
+                        time: '',
+                        lat: null,
+                        lng: null,
+                        address: '',
+                        addressShort: '',
+                        remark: '',
+                        exifData: {}
+                    };
+                    
+                    photoData.push(photoInfo);
+                    renderList();
+                    updateStats(i + 1);
+                    
+                    try {
+                        const exifData = await getExifData(file);
+                        photoInfo.exifData = exifData;
+                        
+                        // 提取时间 - 多种EXIF字段尝试，优先使用拍摄时间
+                        let timeStr = null;
+                        
+                        // 按优先级尝试不同的EXIF时间字段
+                        const timeFields = [
+                            // 优先：拍摄时间
+                            { field: 'DateTimeOriginal', priority: 1 },
+                            { field: 'dateTimeOriginal', priority: 1 },
+                            { field: 'DateTimeDigitized', priority: 2 },
+                            { field: 'dateTimeDigitized', priority: 2 },
+                            { field: 'CreateDate', priority: 3 },
+                            { field: 'createDate', priority: 3 },
+                            // 其次：其他时间
+                            { field: 'DateTime', priority: 4 },
+                            { field: 'ModifyDate', priority: 5 },
+                            { field: 'modifyDate', priority: 5 },
+                            // 最后：备用字段
+                            { field: 'GPSDateStamp', priority: 10 },
+                            { field: 'GPSTimestamp', priority: 10 }
+                        ];
+                        
+                        // 优先按priority排序
+                        timeFields.sort((a, b) => a.priority - b.priority);
+                        
+                        for (const item of timeFields) {
+                            const field = item.field;
+                            if (exifData[field]) {
+                                console.log(`尝试字段: ${field}, 值:`, exifData[field]);
+                                const parsed = parseExifTime(exifData[field], field);
+                                if (parsed) {
+                                    timeStr = parsed;
+                                    console.log(`成功解析时间: ${timeStr}`);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // 如果EXIF没有时间，使用文件修改时间作为兜底
+                        if (!timeStr) {
+                            console.log('EXIF无时间，使用文件修改时间');
+                            timeStr = formatFileTime(file.lastModified);
+                        }
+                        
+                        photoInfo.time = timeStr;
+                        
+                        // 提取GPS
+                        const gps = parseGPS(exifData);
+                        if (gps) {
+                            photoInfo.lat = gps.lat;
+                            photoInfo.lng = gps.lng;
+                            photoInfo.address = '🔄 解析中...';
+                            const addressData = await getAddress(gps.lat, gps.lng, amapKey);
+                            // 地址后面显示"在XX附近"（如果地址没有包含这个位置）
+                            if (addressData.nearBy && !addressData.fullAddress.includes(addressData.nearBy)) {
+                                photoInfo.address = `${addressData.fullAddress}在${addressData.nearBy}附近`;
+                            } else {
+                                photoInfo.address = addressData.fullAddress;
+                            }
+                            photoInfo.addressShort = getAddressShort(addressData.fullAddress);
+                            photoInfo.status = 'success';
+                        } else {
+                            photoInfo.status = 'no-location';
+                            photoInfo.address = '无GPS信息';
+                        }
+                    } catch (err) {
+                        console.error('EXIF提取失败:', err);
+                        photoInfo.status = 'error';
+                        photoInfo.address = '读取失败';
+                    }
+                    
+                    renderList();
+                    updateStats(i + 1);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // 提取EXIF数据
+        function getExifData(file) {
+            return new Promise((resolve, reject) => {
+                EXIF.getData(file, function() {
+                    const allData = EXIF.getAllTags(this);
+                    resolve(allData);
+                });
+            });
+        }
+        
+        // 解析EXIF时间字符串 - 增强版
+        function parseExifTime(dateTimeStr, fieldName) {
+            if (dateTimeStr === undefined || dateTimeStr === null) return null;
+            
+            try {
+                let date = null;
+                const str = String(dateTimeStr).trim();
+                
+                // 格式1: EXIF标准格式 "2024:01:15 10:30:00"
+                if (str.match(/^\d{4}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2}$/)) {
+                    const parts = str.split(' ');
+                    const dateParts = parts[0].split(':');
+                    const timeParts = parts[1].split(':');
+                    date = new Date(
+                        parseInt(dateParts[0]),
+                        parseInt(dateParts[1]) - 1,
+                        parseInt(dateParts[2]),
+                        parseInt(timeParts[0]),
+                        parseInt(timeParts[1]),
+                        parseInt(timeParts[2])
+                    );
+                }
+                // 格式2: ISO格式 "2024-01-15T10:30:00" 或 "2024-01-15T10:30:00Z"
+                else if (str.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+                    date = new Date(str.replace('Z', '+0000'));
+                }
+                // 格式3: 空格分隔 "2024-01-15 10:30:00"
+                else if (str.match(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/)) {
+                    date = new Date(str.replace(' ', 'T'));
+                }
+                // 格式4: 纯日期 "2024:01:15" (GPS日期戳)
+                else if (str.match(/^\d{4}:\d{2}:\d{2}$/)) {
+                    const parts = str.split(':');
+                    date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                }
+                // 格式5: 纯数字时间戳
+                else if (!isNaN(str) && str.length >= 10) {
+                    const timestamp = parseInt(str);
+                    // 判断是秒还是毫秒
+                    date = timestamp > 1e12 ? new Date(timestamp) : new Date(timestamp * 1000);
+                }
+                // 格式6: GPS时间戳数组 [时, 分, 秒]
+                else if (Array.isArray(dateTimeStr) && dateTimeStr.length >= 3) {
+                    // 这需要结合GPSDateStamp使用，暂时返回null
+                    return null;
+                }
+                // 格式7: 尝试直接解析
+                else {
+                    const directDate = new Date(str);
+                    if (!isNaN(directDate.getTime())) {
+                        date = directDate;
+                    }
+                }
+                
+                // 验证日期有效性
+                if (date && !isNaN(date.getTime())) {
+                    const year = date.getFullYear();
+                    const now = new Date();
+                    // 合理范围：1990年到未来1年内
+                    if (year >= 1990 && year <= now.getFullYear() + 1) {
+                        // 返回标准格式: YYYY-MM-DD HH:mm:ss
+                        const y = date.getFullYear();
+                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                        const d = String(date.getDate()).padStart(2, '0');
+                        const h = String(date.getHours()).padStart(2, '0');
+                        const min = String(date.getMinutes()).padStart(2, '0');
+                        const s = String(date.getSeconds()).padStart(2, '0');
+                        return `${y}-${m}-${d} ${h}:${min}:${s}`;
+                    }
+                }
+                
+                return null;
+            } catch (e) {
+                console.warn(`时间解析失败 (${fieldName}):`, dateTimeStr, e);
+                return null;
+            }
+        }
+        
+        // 格式化文件修改时间 - 优化版
+        function formatFileTime(timestamp) {
+            try {
+                const date = new Date(timestamp);
+                if (!isNaN(date.getTime())) {
+                    // 格式化为标准格式
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    const h = String(date.getHours()).padStart(2, '0');
+                    const min = String(date.getMinutes()).padStart(2, '0');
+                    const s = String(date.getSeconds()).padStart(2, '0');
+                    return `${y}-${m}-${d} ${h}:${min}:${s}`;
+                }
+                return '未知时间';
+            } catch (e) {
+                return '未知时间';
+            }
+        }
+        
+        // 渲染列表
+        function renderList() {
+            const list = document.getElementById('photoList');
+            
+            if (photoData.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                        <div class="empty-text">暂无照片，请先选择照片</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = photoData.map(photo => {
+                let statusClass, statusText;
+                switch(photo.status) {
+                    case 'success':
+                        statusClass = 'status-success';
+                        statusText = '✓ 已提取';
+                        break;
+                    case 'processing':
+                        statusClass = 'status-processing';
+                        statusText = '⏳ 处理中';
+                        break;
+                    case 'no-location':
+                        statusClass = 'status-no-location';
+                        statusText = '⚠️ 无位置';
+                        break;
+                    case 'error':
+                        statusClass = 'status-error';
+                        statusText = '✗ 失败';
+                        break;
+                }
+                
+                const location = photo.lat && photo.lng ? `${photo.lat}, ${photo.lng}` : '无';
+                
+                return `
+                    <div class="photo-item">
+                        <img src="${photo.thumbnail}" class="photo-thumb" alt="${photo.name}">
+                        <div class="photo-info">
+                            <div class="photo-name">${photo.name}</div>
+                            <div class="photo-detail">📍 ${location}</div>
+                            <div class="photo-detail">🏠 ${photo.address || '-'}</div>
+                            ${photo.remark ? `<div class="photo-remark">📝 ${photo.remark}</div>` : ''}
+                        </div>
+                        <div class="status-badge ${statusClass}">${statusText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 更新统计
+        function updateStats(processedCount) {
+            const total = photoData.length;
+            const success = photoData.filter(p => p.status === 'success').length;
+            const hasLocation = photoData.filter(p => p.lat && p.lng).length;
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('successCount').textContent = success;
+            document.getElementById('locationCount').textContent = hasLocation;
+            
+            if (total > 0) {
+                const percent = Math.round((success / total) * 100);
+                document.getElementById('progressText').textContent = `${percent}%`;
+                document.getElementById('progressBar').style.width = `${percent}%`;
+            }
+        }
+        
+        // 导出Excel
+        function exportExcel() {
+            const validData = photoData.filter(p => p.status === 'success' || p.status === 'no-location');
+            
+            if (validData.length === 0) {
+                showToast('没有可导出的数据');
+                return;
+            }
+            
+            const data = validData.map(photo => ({
+                '文件名': photo.name,
+                '新文件名': photo.newName || photo.name,
+                '拍摄时间': photo.time || '',
+                '纬度': photo.lat || '',
+                '经度': photo.lng || '',
+                '地址': photo.address || '',
+                '备注': photo.remark || '',
+                '设备': photo.exifData.Make ? `${photo.exifData.Make} ${photo.exifData.Model || ''}` : ''
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '照片位置信息');
+            
+            const fileName = `照片位置信息_${new Date().toISOString().slice(0,10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showToast(`✅ 导出成功！共 ${data.length} 条记录`);
+        }
+        
+        // 清空全部
+        function clearAll() {
+            if (photoData.length === 0) {
+                showToast('没有数据可清空');
+                return;
+            }
+            
+            if (confirm('确定要清空所有照片吗？')) {
+                photoData = [];
+                document.getElementById('statsCard').style.display = 'none';
+                document.getElementById('photoListCard').style.display = 'none';
+                document.getElementById('exportCard').style.display = 'none';
+                document.getElementById('fileInput').value = '';
+                showToast('已清空所有数据');
+            }
+        }
+        
+        // 批量重命名弹窗
+        function showBatchRenameModal() {
+            const photosWithLocation = photoData.filter(p => p.lat && p.lng);
+            
+            if (photosWithLocation.length === 0) {
+                showToast('没有带位置信息的照片可导出');
+                return;
+            }
+            
+            document.getElementById('batchRenameModal').classList.add('show');
+            updatePreview();
+        }
+        
+        function closeBatchRenameModal() {
+            document.getElementById('batchRenameModal').classList.remove('show');
+        }
+        
+        // 更新预览
+        function updatePreview() {
+            const renameType = document.getElementById('renameType').value;
+            const prefix = document.getElementById('customPrefix').value;
+            const startNum = parseInt(document.getElementById('startNumber').value) || 1;
+            const digits = parseInt(document.getElementById('numberDigits').value) || 3;
+            const includeRemark = document.getElementById('includeRemark').checked;
+            
+            document.getElementById('prefixGroup').style.display = renameType === 'custom' ? 'block' : 'none';
+            
+            const photosWithLocation = photoData.filter(p => p.lat && p.lng);
+            const previewList = document.getElementById('previewList');
+            
+            const previewHtml = photosWithLocation.slice(0, 8).map((photo, index) => {
+                const num = startNum + index;
+                const numStr = String(num).padStart(digits, '0');
+                let newName = '';
+                
+                switch(renameType) {
+                    case 'sequential':
+                        newName = `${numStr}`;
+                        break;
+                    case 'time':
+                        const time = photo.time ? photo.time.replace(/[\s:]/g, '').slice(0, 14) : '';
+                        newName = time || `photo_${numStr}`;
+                        break;
+                    case 'location':
+                        newName = photo.addressShort || 'unknown';
+                        break;
+                    case 'custom':
+                        newName = prefix ? `${prefix}_${numStr}` : numStr;
+                        break;
+                }
+                
+                if (includeRemark && newName) {
+                    photo.remark = newName;
+                }
+                
+                const ext = photo.name.split('.').pop() || 'jpg';
+                const fullNewName = `${newName}.${ext}`;
+                
+                return `
+                    <div class="preview-item">
+                        <div class="preview-old">${photo.name}</div>
+                        <div class="preview-new">→ ${fullNewName}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            previewList.innerHTML = previewHtml || '<div class="preview-item" style="color: #9ca3af;">暂无预览</div>';
+        }
+        
+        // 确认批量导出
+        async function confirmBatchRename() {
+            closeBatchRenameModal();
+            
+            const photosWithLocation = photoData.filter(p => p.lat && p.lng);
+            
+            exportCancelled = false;
+            document.getElementById('exportModal').classList.add('show');
+            document.getElementById('exportProgressBar').style.width = '0%';
+            
+            const zip = new JSZip();
+            const folder = zip.folder("带水印照片");
+            
+            const total = photosWithLocation.length;
+            const startNum = parseInt(document.getElementById('startNumber').value) || 1;
+            const digits = parseInt(document.getElementById('numberDigits').value) || 3;
+            const renameType = document.getElementById('renameType').value;
+            const prefix = document.getElementById('customPrefix').value;
+            const includeRemark = document.getElementById('includeRemark').checked;
+            
+            for (let i = 0; i < total; i++) {
+                if (exportCancelled) break;
+                
+                const photo = photosWithLocation[i];
+                const percent = Math.round(((i + 1) / total) * 100);
+                
+                document.getElementById('exportStatus').textContent = `${i + 1} / ${total}`;
+                document.getElementById('exportPercent').textContent = `${percent}%`;
+                document.getElementById('exportProgressBar').style.width = `${percent}%`;
+                
+                try {
+                    const num = startNum + i;
+                    const numStr = String(num).padStart(digits, '0');
+                    let newName = '';
+                    
+                    switch(renameType) {
+                        case 'sequential':
+                            newName = `${numStr}`;
+                            break;
+                        case 'time':
+                            const time = photo.time ? photo.time.replace(/[\s:]/g, '').slice(0, 14) : '';
+                            newName = time || `photo_${numStr}`;
+                            break;
+                        case 'location':
+                            newName = photo.addressShort || 'unknown';
+                            break;
+                        case 'custom':
+                            newName = prefix ? `${prefix}_${numStr}` : numStr;
+                            break;
+                    }
+                    
+                    if (includeRemark) {
+                        photo.remark = newName;
+                    }
+                    
+                    const ext = photo.name.split('.').pop() || 'jpg';
+                    photo.newName = `${newName}.${ext}`;
+                    
+                    const watermarkedDataUrl = await addWatermark(photo);
+                    const base64Data = watermarkedDataUrl.split(',')[1];
+                    folder.file(photo.newName, base64Data, {base64: true});
+                    
+                    renderList();
+                } catch (e) {
+                    console.error('处理照片失败:', photo.name, e);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+            
+            if (!exportCancelled) {
+                const content = await zip.generateAsync({type: "blob"});
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `带水印照片_${new Date().toISOString().slice(0,10)}.zip`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                document.getElementById('exportModal').classList.remove('show');
+                showToast(`✅ 导出成功！共 ${total} 张带水印照片`);
+            }
+        }
+        
+        // 添加水印
+        function addWatermark(photo) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const fontSize = Math.max(12, Math.floor(Math.min(canvas.width, canvas.height) / 40));
+                    const padding = fontSize * 0.5;
+                    const lineHeight = fontSize * 1.3;
+                    
+                    let timeStr = '';
+                    if (photo.time) {
+                        try {
+                            const dt = new Date(photo.time);
+                            timeStr = dt.toISOString().slice(0, 19).replace('T', ' ');
+                        } catch(e) {
+                            timeStr = photo.time;
+                        }
+                    }
+                    
+                    const remarkText = photo.remark || '';
+                    const items = [
+                        { label: '经度', value: String(photo.lng) },
+                        { label: '纬度', value: String(photo.lat) },
+                        { label: '地址', value: photo.address || '' },
+                        { label: '时间', value: timeStr },
+                        { label: '备注', value: remarkText }
+                    ].filter(item => item.value);
+                    
+                    const maxWatermarkWidth = canvas.width * 0.6;
+                    const leftMargin = canvas.width * 0.01;
+                    const bottomMargin = canvas.height * 0.01;
+                    
+                    ctx.font = `bold ${fontSize}px Microsoft YaHei, sans-serif`;
+                    
+                    const labelWidth = Math.max(
+                        ctx.measureText('地址:').width,
+                        ctx.measureText('备注:').width
+                    );
+                    const maxValueWidth = maxWatermarkWidth - labelWidth - padding * 2;
+                    
+                    const wrappedLines = [];
+                    
+                    items.forEach(item => {
+                        const labelText = `${item.label}:`;
+                        const fullLabelWidth = ctx.measureText(labelText).width;
+                        
+                        let remainingText = item.value;
+                        let isFirstLine = true;
+                        
+                        while (remainingText) {
+                            let fitText = '';
+                            for (let i = remainingText.length; i >= 0; i--) {
+                                const testText = remainingText.slice(0, i);
+                                const testWidth = ctx.measureText(testText).width;
+                                if (testWidth <= maxValueWidth) {
+                                    fitText = testText;
+                                    break;
+                                }
+                            }
+                            
+                            if (!fitText && remainingText.length > 0) {
+                                fitText = remainingText[0];
+                            }
+                            
+                            if (isFirstLine) {
+                                wrappedLines.push({
+                                    label: labelText,
+                                    value: fitText,
+                                    labelWidth: fullLabelWidth,
+                                    isLabel: true
+                                });
+                                isFirstLine = false;
+                            } else {
+                                wrappedLines.push({
+                                    label: '',
+                                    value: fitText,
+                                    labelWidth: fullLabelWidth,
+                                    isLabel: false
+                                });
+                            }
+                            
+                            remainingText = remainingText.slice(fitText.length);
+                        }
+                    });
+                    
+                    const bgWidth = maxWatermarkWidth;
+                    const bgHeight = wrappedLines.length * lineHeight + padding * 2;
+                    
+                    const x = leftMargin;
+                    const y = canvas.height - bgHeight - bottomMargin;
+                    
+                    // 半透明灰色背景30%
+                    ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, bgWidth, bgHeight, 8);
+                    ctx.fill();
+                    
+                    // 白色文字
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${fontSize}px Microsoft YaHei, sans-serif`;
+                    ctx.textBaseline = 'top';
+                    
+                    wrappedLines.forEach((line, index) => {
+                        const textY = y + padding + index * lineHeight;
+                        
+                        if (line.isLabel) {
+                            ctx.fillText(line.label, x + padding, textY);
+                            ctx.fillText(line.value, x + padding + line.labelWidth, textY);
+                        } else {
+                            ctx.fillText(line.value, x + padding + labelWidth, textY);
+                        }
+                    });
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.92));
+                };
+                img.onerror = reject;
+                img.src = photo.thumbnail;
+            });
+        }
+        
+        // 取消导出
+        function cancelExport() {
+            exportCancelled = true;
+            document.getElementById('exportModal').classList.remove('show');
+            showToast('已取消导出');
+        }
+        
+        // 添加roundRect支持
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.beginPath();
+                this.moveTo(x + r, y);
+                this.arcTo(x + w, y, x + w, y + h, r);
+                this.arcTo(x + w, y + h, x, y + h, r);
+                this.arcTo(x, y + h, x, y, r);
+                this.arcTo(x, y, x + w, y, r);
+                this.closePath();
+                return this;
+            };
+        }
+    </script>
+</body>
+</html>
