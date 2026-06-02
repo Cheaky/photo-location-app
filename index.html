@@ -617,6 +617,73 @@
         input[type="file"] {
             display: none;
         }
+        
+        /* Image Preview Modal */
+        .preview-modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .preview-close-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            z-index: 10;
+        }
+        
+        #previewImage {
+            max-width: 90vw;
+            max-height: 70vh;
+            border-radius: 12px;
+            object-fit: contain;
+        }
+        
+        .preview-info {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+            width: 100%;
+            max-width: 500px;
+            text-align: left;
+        }
+        
+        .preview-info-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 13px;
+        }
+        
+        .preview-info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .preview-info-label {
+            color: #6b7280;
+            min-width: 60px;
+        }
+        
+        .preview-info-value {
+            color: #1f2937;
+            flex: 1;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -779,10 +846,20 @@
         </div>
     </div>
     
+    <!-- Image Preview Modal -->
+    <div class="modal-overlay" id="imagePreviewModal">
+        <div class="preview-modal-content">
+            <button class="preview-close-btn" onclick="closeImagePreview()">&times;</button>
+            <img id="previewImage" src="" alt="Preview">
+            <div class="preview-info" id="previewInfo"></div>
+        </div>
+    </div>
+    
     <script>
         // 存储照片数据
         let photoData = [];
         let exportCancelled = false;
+        let allPhotosProcessed = false;
         
         // Toast提示
         function showToast(message, duration = 3000) {
@@ -791,6 +868,61 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), duration);
         }
+        
+        // 图片预览功能
+        function openImagePreview(photoId) {
+            const photo = photoData.find(p => p.id === photoId);
+            if (!photo) return;
+            
+            const modal = document.getElementById('imagePreviewModal');
+            const img = document.getElementById('previewImage');
+            const info = document.getElementById('previewInfo');
+            
+            img.src = photo.thumbnail;
+            
+            const location = photo.lat && photo.lng ? `${photo.lat}, ${photo.lng}` : '无';
+            const statusText = photo.status === 'success' ? '✓ 已提取' : 
+                             photo.status === 'no-location' ? '⚠️ 无位置' : 
+                             photo.status === 'error' ? '✗ 失败' : '⏳ 处理中';
+            
+            info.innerHTML = `
+                <div class="preview-info-row">
+                    <span class="preview-info-label">文件名</span>
+                    <span class="preview-info-value">${photo.name}</span>
+                </div>
+                <div class="preview-info-row">
+                    <span class="preview-info-label">状态</span>
+                    <span class="preview-info-value">${statusText}</span>
+                </div>
+                <div class="preview-info-row">
+                    <span class="preview-info-label">时间</span>
+                    <span class="preview-info-value">${photo.time || '未知'}</span>
+                </div>
+                <div class="preview-info-row">
+                    <span class="preview-info-label">位置</span>
+                    <span class="preview-info-value">${location}</span>
+                </div>
+                <div class="preview-info-row">
+                    <span class="preview-info-label">地址</span>
+                    <span class="preview-info-value">${photo.address || '-'}</span>
+                </div>
+                ${photo.remark ? `<div class="preview-info-row"><span class="preview-info-label">备注</span><span class="preview-info-value">${photo.remark}</span></div>` : ''}
+            `;
+            
+            modal.classList.add('show');
+        }
+        
+        function closeImagePreview() {
+            document.getElementById('imagePreviewModal').classList.remove('show');
+        }
+        
+        // 点击模态框背景关闭
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('imagePreviewModal');
+            if (e.target === modal) {
+                closeImagePreview();
+            }
+        });
         
         // 检查API Key
         function checkApiKey() {
@@ -959,7 +1091,10 @@
         async function handleFiles(files) {
             if (!files || files.length === 0) return;
             
-            const amapKey = checkApiKey();
+            // 重置状态
+            allPhotosProcessed = false;
+            
+            const amapKey = document.getElementById('amapKey').value.trim();
             if (!amapKey) {
                 document.getElementById('fileInput').value = '';
                 return;
@@ -1235,7 +1370,7 @@
                 
                 return `
                     <div class="photo-item">
-                        <img src="${photo.thumbnail}" class="photo-thumb" alt="${photo.name}">
+                        <img src="${photo.thumbnail}" class="photo-thumb" alt="${photo.name}" onclick="openImagePreview('${photo.id}')" style="cursor: pointer;">
                         <div class="photo-info">
                             <div class="photo-name">${photo.name}</div>
                             <div class="photo-detail">📍 ${location}</div>
@@ -1252,16 +1387,34 @@
         function updateStats(processedCount) {
             const total = photoData.length;
             const success = photoData.filter(p => p.status === 'success').length;
+            const failed = photoData.filter(p => p.status === 'error' || p.status === 'no-location').length;
             const hasLocation = photoData.filter(p => p.lat && p.lng).length;
             
             document.getElementById('totalCount').textContent = total;
             document.getElementById('successCount').textContent = success;
             document.getElementById('locationCount').textContent = hasLocation;
             
-            if (total > 0) {
-                const percent = Math.round((success / total) * 100);
+            // 检查是否所有照片都处理完成
+            const processing = photoData.filter(p => p.status === 'processing').length;
+            
+            if (total > 0 && processing === 0 && !allPhotosProcessed) {
+                // 所有照片处理完成
+                allPhotosProcessed = true;
+                document.getElementById('progressText').textContent = '处理完成！';
+                document.getElementById('progressBar').style.width = '100%';
+                
+                // 显示处理结果统计
+                let resultMessage = `✅ 处理完成！`;
+                if (success > 0) resultMessage += `成功${success}张`;
+                if (failed > 0) resultMessage += `，失败${failed}张`;
+                if (hasLocation > 0) resultMessage += `，有位置${hasLocation}张`;
+                
+                showToast(resultMessage, 5000);
+            } else if (processing > 0) {
+                const percent = Math.round(((success + failed) / total) * 100);
                 document.getElementById('progressText').textContent = `${percent}%`;
                 document.getElementById('progressBar').style.width = `${percent}%`;
+            }
             }
         }
         
